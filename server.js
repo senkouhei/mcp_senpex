@@ -12,6 +12,8 @@ import express from "express";
 import { spawn } from "child_process";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import { createMCPServer } from "./mcp-server.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -37,11 +39,17 @@ app.get("/api", (req, res) => {
       health: "/health",
       api: "/api",
       chat: "/chat (POST)",
-      sse: "/sse (GET - Server-Sent Events)",
+      sse: "/sse (GET - MCP over SSE for n8n)",
+      message: "/message (POST - SSE message handler)",
       mcp_tools: "/mcp/tools (GET)",
       mcp_tool_call: "/mcp/tools/:toolName (POST)",
     },
-    note: "This is an HTTP wrapper. For MCP stdio usage, run index.js directly with Node.js",
+    n8n_config: {
+      endpoint: "https://mcp-senpex.onrender.com/sse",
+      transport: "HTTP Streamable",
+      authentication: "None"
+    },
+    note: "For n8n MCP Client: Use /sse endpoint with HTTP Streamable transport",
   });
 });
 
@@ -106,67 +114,34 @@ app.post("/mcp/tools/:toolName", async (req, res) => {
   }
 });
 
-// SSE endpoint for MCP streaming
-app.get("/sse", (req, res) => {
-  // Set headers for SSE
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-  res.setHeader("Access-Control-Allow-Origin", "*");
-
-  // Send initial connection message
-  res.write(`data: ${JSON.stringify({ type: "connection", status: "connected", timestamp: new Date().toISOString() })}\n\n`);
-
-  // Spawn MCP server process for this connection
-  const mcpProcess = spawn("node", [join(__dirname, "index.js")], {
-    env: process.env,
-  });
-
-  let messageBuffer = "";
-
-  // Handle MCP server output
-  mcpProcess.stdout.on("data", (data) => {
-    messageBuffer += data.toString();
+// SSE endpoint for MCP (THIS IS WHAT N8N NEEDS!)
+app.get("/sse", async (req, res) => {
+  console.log("SSE connection established from:", req.ip);
+  
+  try {
+    // Create a new MCP server instance for this connection
+    const mcpServer = createMCPServer();
     
-    // Try to parse complete JSON messages
-    const lines = messageBuffer.split("\n");
-    messageBuffer = lines.pop() || ""; // Keep incomplete line in buffer
+    // Create SSE transport - this handles all the SSE protocol details
+    const transport = new SSEServerTransport("/message", res);
     
-    lines.forEach((line) => {
-      if (line.trim()) {
-        try {
-          const message = JSON.parse(line);
-          res.write(`data: ${JSON.stringify(message)}\n\n`);
-        } catch (e) {
-          // Not JSON, send as raw message
-          res.write(`data: ${JSON.stringify({ type: "raw", content: line })}\n\n`);
-        }
-      }
-    });
-  });
+    // Connect MCP server to SSE transport
+    await mcpServer.connect(transport);
+    
+    console.log("MCP server connected via SSE");
+  } catch (error) {
+    console.error("SSE connection error:", error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+});
 
-  mcpProcess.stderr.on("data", (data) => {
-    res.write(`data: ${JSON.stringify({ type: "error", message: data.toString() })}\n\n`);
-  });
-
-  mcpProcess.on("close", (code) => {
-    res.write(`data: ${JSON.stringify({ type: "close", code })}\n\n`);
-    res.end();
-  });
-
-  // Handle client disconnect
-  req.on("close", () => {
-    mcpProcess.kill();
-  });
-
-  // Send periodic heartbeat
-  const heartbeat = setInterval(() => {
-    res.write(`data: ${JSON.stringify({ type: "heartbeat", timestamp: new Date().toISOString() })}\n\n`);
-  }, 30000);
-
-  req.on("close", () => {
-    clearInterval(heartbeat);
-  });
+// Message endpoint for SSE (required by SSEServerTransport)
+app.post("/message", async (req, res) => {
+  // This is handled by SSEServerTransport internally
+  // Just acknowledge receipt
+  res.status(200).send();
 });
 
 // List available tools
