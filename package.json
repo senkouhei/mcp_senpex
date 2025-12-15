@@ -1,0 +1,30 @@
+{
+  "name": "senpex-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP Server for Senpex Delivery API integration",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "start:mcp": "node index.js",
+    "dev": "node --watch server.js",
+    "dev:mcp": "node --watch index.js"
+  },
+  "keywords": [
+    "mcp",
+    "senpex",
+    "delivery",
+    "api"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "axios": "^1.7.9",
+    "express": "^4.18.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
+
