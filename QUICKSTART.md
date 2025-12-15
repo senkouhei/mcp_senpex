@@ -86,7 +86,7 @@ git commit -m "Initial commit"
 
 ```bash
 # Create a repo on GitHub, then:
-git remote add origin https://github.com/yourusername/senpex-mcp.git
+git remote add origin https://github.com/senkouhei/mcp_senpex.git
 git push -u origin main
 ```
 
