@@ -1,350 +1,424 @@
 # Deployment Guide
 
-This guide covers different ways to deploy the Senpex MCP Server.
+Complete guide for deploying the Senpex AI Agent system.
 
-## Table of Contents
+## 🏗️ Architecture Overview
 
-1. [Local Usage (MCP Stdio)](#local-usage-mcp-stdio)
-2. [Deploy to Render (HTTP API)](#deploy-to-render-http-api)
-3. [Docker Deployment](#docker-deployment)
-4. [Environment Variables](#environment-variables)
-
----
-
-## Local Usage (MCP Stdio)
-
-The native MCP server uses stdio transport for communication with MCP clients (like Claude Desktop, IDEs, etc.).
-
-### Setup
-
-1. Install dependencies:
-```bash
-npm install
+```
+                    Internet
+                       │
+         ┌─────────────┼─────────────┐
+         │             │             │
+    Chainlit UI   Streamlit UI   n8n
+    (Port 8000)   (Port 8501)
+         │             │             │
+         └─────────────┼─────────────┘
+                       │
+                  Agent API
+                 (Port 8080)
+                       │
+                  MCP Server  ──────▶  Senpex API
+                 (Port 3000)
 ```
 
-2. Create `.env` file:
-```bash
-cp env.example .env
-```
+## 🚀 Deployment Options
 
-3. Add your Senpex credentials to `.env`:
-```
-SENPEX_CLIENT_ID=your_client_id
-SENPEX_SECRET_ID=your_secret_id
-```
+### Option 1: Render (Recommended for Production)
 
-### Run MCP Server
+Render provides easy deployment with the included `render.yaml`.
 
-```bash
-npm run start:mcp
-```
+#### Prerequisites
+- GitHub account
+- Render account (free tier works)
+- Senpex API credentials
 
-### Configure MCP Client
+#### Steps
 
-Add to your MCP client configuration (e.g., Claude Desktop):
+1. **Fork/Clone Repository**
+   ```bash
+   git clone https://github.com/your-username/mcp_senpex.git
+   cd mcp_senpex
+   ```
 
-```json
-{
-  "mcpServers": {
-    "senpex": {
-      "command": "node",
-      "args": ["/absolute/path/to/senpex-mcp/index.js"],
-      "env": {
-        "SENPEX_CLIENT_ID": "your_client_id",
-        "SENPEX_SECRET_ID": "your_secret_id"
-      }
-    }
-  }
-}
-```
+2. **Push to GitHub**
+   ```bash
+   git remote add origin https://github.com/your-username/mcp_senpex.git
+   git push -u origin main
+   ```
 
----
+3. **Deploy on Render**
 
-## Deploy to Render (HTTP API)
-
-For cloud deployment, we provide an HTTP wrapper (`server.js`) that exposes the MCP tools via REST API.
-
-### Method 1: Render Dashboard (Easiest)
-
-1. **Push to GitHub**
-   - Create a new GitHub repository
-   - Push your code: `git push origin main`
-
-2. **Create Web Service on Render**
+   **Option A: Using Blueprint (Easiest)**
+   
    - Go to [Render Dashboard](https://dashboard.render.com/)
-   - Click "New +" → "Web Service"
+   - Click "New" → "Blueprint"
    - Connect your GitHub repository
-   - Select the repository
+   - Select `render.yaml`
+   - Add environment variables:
+     - `SENPEX_CLIENT_ID`: Your Senpex client ID
+     - `SENPEX_SECRET_ID`: Your Senpex secret ID
+     - `OPENAI_API_KEY`: Your OpenAI API key (optional)
+   - Click "Apply"
 
-3. **Configure Service**
-   - **Name**: `senpex-mcp-server`
-   - **Region**: Choose closest to you
-   - **Branch**: `main`
-   - **Runtime**: `Node`
-   - **Build Command**: `npm install`
-   - **Start Command**: `npm start`
-   - **Plan**: Free or Starter
+   Render will create all 4 services automatically!
 
-4. **Add Environment Variables**
-   - `NODE_ENV`: `production`
-   - `SENPEX_CLIENT_ID`: Your Senpex client ID
-   - `SENPEX_SECRET_ID`: Your Senpex secret ID
-   - `PORT`: `10000` (or leave empty for default)
+   **Option B: Manual Setup**
+   
+   Create each service individually:
 
-5. **Deploy**
-   - Click "Create Web Service"
-   - Wait for deployment (takes 2-5 minutes)
+   **Service 1: MCP Server**
+   - Type: Web Service
+   - Name: `mcp-senpex`
+   - Root Directory: `mcp-server`
+   - Build Command: `npm install`
+   - Start Command: `npm start`
+   - Port: 3000
+   - Environment Variables:
+     ```
+     SENPEX_CLIENT_ID=your_client_id
+     SENPEX_SECRET_ID=your_secret_id
+     NODE_ENV=production
+     ```
 
-6. **Access Your API**
-   - Your service will be available at: `https://your-service-name.onrender.com`
-   - Health check: `https://your-service-name.onrender.com/health`
-   - API info: `https://your-service-name.onrender.com/`
+   **Service 2: Agent API**
+   - Type: Web Service
+   - Name: `senpex-agent-api`
+   - Root Directory: `agent-core`
+   - Build Command: `pip install -r requirements.txt`
+   - Start Command: `uvicorn main:app --host 0.0.0.0 --port 8080`
+   - Port: 8080
+   - Environment Variables:
+     ```
+     MCP_SERVER_URL=https://mcp-senpex.onrender.com/sse
+     OPENAI_API_KEY=sk-xxx (optional)
+     ```
 
-### Method 2: Render Blueprint (render.yaml)
+   **Service 3: Chainlit UI**
+   - Type: Web Service
+   - Name: `senpex-chat`
+   - Root Directory: `chainlit-ui`
+   - Docker: Yes (use Dockerfile)
+   - Port: 8000
+   - Environment Variables:
+     ```
+     AGENT_API_URL=https://senpex-agent-api.onrender.com
+     ```
 
-1. **Push to GitHub** (with `render.yaml` included)
+   **Service 4: Streamlit UI**
+   - Type: Web Service
+   - Name: `senpex-ops`
+   - Root Directory: `streamlit-ui`
+   - Docker: Yes (use Dockerfile)
+   - Port: 8501
+   - Environment Variables:
+     ```
+     AGENT_API_URL=https://senpex-agent-api.onrender.com
+     ```
 
-2. **Create Blueprint on Render**
-   - Go to [Render Dashboard](https://dashboard.render.com/)
-   - Click "New +" → "Blueprint"
-   - Connect your repository
-   - Render auto-detects `render.yaml`
+4. **Access Your Services**
 
-3. **Configure Environment Variables**
-   - Add required variables when prompted
-   - Deploy
+   After deployment completes (~5-10 minutes):
+   
+   - **Chat UI**: `https://senpex-chat.onrender.com`
+   - **Ops Dashboard**: `https://senpex-ops.onrender.com`
+   - **Agent API**: `https://senpex-agent-api.onrender.com`
+   - **MCP Server**: `https://mcp-senpex.onrender.com`
 
-### Method 3: Render CLI
+5. **Configure n8n**
+
+   In your n8n MCP Client node:
+   - Endpoint: `https://mcp-senpex.onrender.com/sse`
+   - Transport: HTTP Streamable
+   - Auth: None
+
+### Option 2: Docker Compose (Local/VM)
+
+Perfect for development or self-hosted deployment.
+
+#### Prerequisites
+- Docker & Docker Compose installed
+- Senpex API credentials
+
+#### Steps
+
+1. **Clone Repository**
+   ```bash
+   git clone https://github.com/your-username/mcp_senpex.git
+   cd mcp_senpex
+   ```
+
+2. **Create .env File**
+   ```bash
+   cat > .env << EOF
+   SENPEX_CLIENT_ID=your_client_id
+   SENPEX_SECRET_ID=your_secret_id
+   OPENAI_API_KEY=sk-xxx
+   EOF
+   ```
+
+3. **Start Services**
+   ```bash
+   docker-compose up -d
+   ```
+
+4. **Access Services**
+   - Chat UI: http://localhost:8000
+   - Ops Dashboard: http://localhost:8501
+   - Agent API: http://localhost:8080
+   - MCP Server: http://localhost:3000
+
+5. **View Logs**
+   ```bash
+   docker-compose logs -f
+   ```
+
+6. **Stop Services**
+   ```bash
+   docker-compose down
+   ```
+
+### Option 3: Kubernetes (Advanced)
+
+For large-scale production deployments.
+
+Coming soon - contact for k8s manifests.
+
+## 🔧 Configuration
+
+### Environment Variables
+
+#### MCP Server
+- `SENPEX_CLIENT_ID` (required): Senpex API client ID
+- `SENPEX_SECRET_ID` (required): Senpex API secret ID
+- `PORT` (optional): Server port, default 3000
+- `NODE_ENV` (optional): Environment mode
+
+#### Agent API
+- `MCP_SERVER_URL` (required): MCP server SSE endpoint
+- `OPENAI_API_KEY` (optional): For future LLM integration
+
+#### Chainlit UI
+- `AGENT_API_URL` (required): Agent API base URL
+
+#### Streamlit UI
+- `AGENT_API_URL` (required): Agent API base URL
+
+### Custom Domains (Render)
+
+1. Go to service settings
+2. Click "Custom Domains"
+3. Add your domain
+4. Update DNS records as instructed
+
+## 🧪 Testing Deployment
+
+### 1. Test MCP Server
 
 ```bash
-# Install Render CLI
-npm install -g @render/cli
+# Health check
+curl https://mcp-senpex.onrender.com/health
 
-# Login
-render login
-
-# Deploy
-render deploy
+# SSE endpoint (should stream)
+curl -N https://mcp-senpex.onrender.com/sse
 ```
 
-### HTTP API Endpoints
-
-Once deployed, your server exposes:
-
-- **GET** `/` - API information
-- **GET** `/health` - Health check
-- **GET** `/mcp/tools` - List available MCP tools
-- **POST** `/mcp/tools/:toolName` - Execute a tool
-
-#### Example: Get a Delivery Quote
+### 2. Test Agent API
 
 ```bash
-curl -X POST https://your-service.onrender.com/mcp/tools/get_dropoff_quote \
+# Health check
+curl https://senpex-agent-api.onrender.com/health
+
+# Send message
+curl -X POST https://senpex-agent-api.onrender.com/agent/message \
   -H "Content-Type: application/json" \
-  -d '{
-    "user_email": "test@example.com",
-    "user_name": "John Doe",
-    "pickup_addr": "123 Main St, San Francisco, CA",
-    "dropoff_addr": "456 Market St, San Francisco, CA"
-  }'
+  -d '{"message": "ping"}'
 ```
 
-#### Example: List Tools
+### 3. Test UIs
 
-```bash
-curl https://your-service.onrender.com/mcp/tools
-```
+- Open Chat UI in browser
+- Send a test message
+- Check Ops Dashboard for logs
 
----
-
-## Docker Deployment
-
-### Build Docker Image
-
-```bash
-docker build -t senpex-mcp-server .
-```
-
-### Run Container Locally
-
-```bash
-docker run -d \
-  -p 3000:3000 \
-  -e SENPEX_CLIENT_ID=your_client_id \
-  -e SENPEX_SECRET_ID=your_secret_id \
-  -e NODE_ENV=production \
-  --name senpex-mcp \
-  senpex-mcp-server
-```
-
-### Test Container
-
-```bash
-curl http://localhost:3000/health
-```
-
-### Deploy to Docker Hub
-
-```bash
-# Tag image
-docker tag senpex-mcp-server your-dockerhub-username/senpex-mcp-server:latest
-
-# Push to Docker Hub
-docker push your-dockerhub-username/senpex-mcp-server:latest
-```
-
-### Deploy to Render with Docker
-
-1. Push your Docker image to Docker Hub or GitHub Container Registry
-2. In Render Dashboard:
-   - Create new "Web Service"
-   - Select "Deploy an existing image from a registry"
-   - Enter your image URL
-   - Configure environment variables
-   - Deploy
-
----
-
-## Environment Variables
-
-### Required
-
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `SENPEX_CLIENT_ID` | Your Senpex API client ID | `abc123...` |
-| `SENPEX_SECRET_ID` | Your Senpex API secret ID | `xyz789...` |
-
-### Optional
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `NODE_ENV` | Environment mode | `development` |
-| `PORT` | HTTP server port (for server.js) | `3000` |
-
----
-
-## Monitoring & Logs
+## 📊 Monitoring
 
 ### Render Dashboard
+- CPU/Memory usage
+- Request logs
+- Error rates
+- Deployment history
 
-- View logs: Navigate to your service → "Logs" tab
-- Monitor metrics: "Metrics" tab
-- Set up alerts: "Settings" → "Alerts"
+### Streamlit Ops Dashboard
+- Active sessions
+- Tool execution logs
+- User analytics
+- System health
 
-### Health Checks
+### Logs
 
-Render automatically monitors `/health` endpoint. Configure:
-- Health Check Path: `/health`
-- Health Check Interval: 30 seconds
-
-### Debugging
-
-View logs in real-time:
+**Render:**
 ```bash
-# Render CLI
-render logs -f your-service-name
+# Via Dashboard: Service → Logs tab
 ```
 
----
+**Docker Compose:**
+```bash
+docker-compose logs -f [service-name]
+```
 
-## Scaling
+## 🔒 Security Best Practices
 
-### Render Plans
+### 1. Environment Variables
+- ✅ Never commit `.env` files
+- ✅ Use Render's encrypted env vars
+- ✅ Rotate API keys regularly
 
-- **Free**: Good for testing, goes to sleep after inactivity
-- **Starter ($7/mo)**: Always on, better performance
-- **Standard/Pro**: Auto-scaling, dedicated resources
+### 2. Authentication
+- 🚧 Add JWT/OAuth to Agent API
+- 🚧 Enable Chainlit auth
+- 🚧 Restrict Streamlit to internal network
 
-### Performance Tips
+### 3. HTTPS
+- ✅ Render provides free SSL
+- ✅ Always use HTTPS URLs
+- ✅ Enable HSTS headers
 
-1. **Cold Starts**: Free tier services sleep after 15 min of inactivity
-2. **Keep Alive**: Use a service like UptimeRobot to ping `/health` every 5 minutes
-3. **Caching**: Consider adding Redis for response caching
-4. **Rate Limiting**: Add rate limiting to prevent abuse
+### 4. Rate Limiting
+- 🚧 Add rate limiting to Agent API
+- 🚧 Implement request throttling
+- 🚧 Set up abuse detection
 
----
+## ⚡ Performance Optimization
 
-## Troubleshooting
+### 1. Caching
+```python
+# Add Redis for session storage
+REDIS_URL = os.getenv("REDIS_URL")
+```
 
-### Service Won't Start
+### 2. Connection Pooling
+```python
+# Use persistent HTTP clients
+httpx.AsyncClient(limits=httpx.Limits(max_connections=100))
+```
 
-1. Check environment variables are set correctly
-2. View logs in Render dashboard
-3. Verify build completed successfully
+### 3. Async Processing
+```python
+# Already using async/await
+# Consider adding task queue for long operations
+```
 
-### API Credentials Invalid
+## 🐛 Troubleshooting
 
-- Double-check `SENPEX_CLIENT_ID` and `SENPEX_SECRET_ID`
-- Ensure no extra spaces in environment variables
-- Test credentials with Senpex API directly
+### Issue: MCP Server connection fails
 
-### Port Issues
+**Symptoms:** n8n can't connect, 500 errors
 
-- Render automatically assigns `PORT` environment variable
-- Use `process.env.PORT || 3000` in your code (already configured)
+**Solutions:**
+1. Check MCP server logs
+2. Verify SSE endpoint: `curl -N https://mcp-senpex.onrender.com/sse`
+3. Ensure environment variables are set
+4. Check Render service status
 
-### Connection Timeouts
+### Issue: Agent API timeout
 
-- Senpex API requests timeout after 30 seconds
-- Check if API is accessible from Render's network
-- Verify no firewall blocking outbound requests
+**Symptoms:** Slow responses, 504 errors
 
----
+**Solutions:**
+1. Check MCP server health
+2. Increase timeout values
+3. Review Render free tier limits
+4. Consider upgrading plan
 
-## Security Best Practices
+### Issue: Chainlit UI not loading
 
-1. **Never commit `.env` file**
-2. **Use environment variables** for all secrets
-3. **Enable HTTPS** (automatic on Render)
-4. **Rotate credentials** regularly
-5. **Monitor API usage** for unusual activity
-6. **Set up rate limiting** if exposing publicly
+**Symptoms:** Blank page, connection refused
 
----
+**Solutions:**
+1. Check Chainlit service logs
+2. Verify AGENT_API_URL is correct
+3. Test Agent API health endpoint
+4. Clear browser cache
 
-## Cost Estimation
+### Issue: Streamlit showing old data
 
-### Render Pricing (as of 2024)
+**Symptoms:** Stale metrics, outdated logs
 
-- **Free Plan**: $0/month
-  - 750 hours/month
-  - Spins down after 15 min inactivity
-  - Good for testing
+**Solutions:**
+1. Click "Refresh Data" button
+2. Enable auto-refresh
+3. Clear cache: `st.cache_data.clear()`
+4. Check Agent API connectivity
 
-- **Starter Plan**: $7/month
-  - Always on
-  - Better performance
-  - No cold starts
+## 📈 Scaling
 
-- **Standard Plan**: $25/month
-  - Auto-scaling
-  - Dedicated resources
-  - Better for production
+### Render Scaling
+- **Free Tier**: Sleeps after 15 min inactivity
+- **Starter**: Always on, better performance
+- **Standard**: Auto-scaling, higher limits
 
-### Senpex API Costs
+### Load Balancing
+```yaml
+# For multiple replicas (Render Standard+)
+scaling:
+  minInstances: 2
+  maxInstances: 10
+  targetCPUPercent: 70
+```
 
-- Check with Senpex for delivery pricing
-- This server only provides integration, actual delivery costs apply separately
+## 🔄 CI/CD
 
----
+Render auto-deploys on git push!
 
-## Next Steps
+### Manual Deploy
+```bash
+git add .
+git commit -m "Update services"
+git push origin main
+```
 
-- ✅ Deploy to Render
-- ✅ Configure environment variables
-- ✅ Test with health check
-- ✅ Try example API calls
-- 📚 Read [README.md](README.md) for tool documentation
-- 🔒 Set up monitoring and alerts
-- 📊 Monitor API usage and costs
+Render will automatically:
+1. Detect changes
+2. Build services
+3. Run health checks
+4. Deploy new versions
 
-## Support
+### Deployment Status
+Monitor at: https://dashboard.render.com/
 
-- **Render Issues**: [Render Support](https://render.com/docs)
-- **Senpex API**: Contact Senpex support
-- **Server Issues**: Open an issue on GitHub
+## 📝 Maintenance
 
----
+### Regular Tasks
+- [ ] Monitor logs daily
+- [ ] Review analytics weekly
+- [ ] Update dependencies monthly
+- [ ] Rotate API keys quarterly
+- [ ] Backup session data regularly
 
-Made with ❤️ for seamless Senpex integration
+### Updates
+```bash
+# Update dependencies
+cd agent-core && pip list --outdated
+cd mcp-server && npm outdated
+```
+
+## 🆘 Support
+
+### Get Help
+1. Check logs (Streamlit Ops Dashboard)
+2. Review Render deployment logs
+3. Test endpoints with curl
+4. Check GitHub issues
+5. Contact support
+
+### Useful Links
+- [Render Docs](https://render.com/docs)
+- [Chainlit Docs](https://docs.chainlit.io)
+- [Streamlit Docs](https://docs.streamlit.io)
+- [MCP SDK Docs](https://modelcontextprotocol.io)
+
+## 📄 License
+
+MIT License - See LICENSE file
+
 

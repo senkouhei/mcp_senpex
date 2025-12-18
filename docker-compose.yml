@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  # MCP Server
+  mcp-server:
+    build: ./mcp-server
+    ports:
+      - "3000:3000"
+    environment:
+      - SENPEX_CLIENT_ID=${SENPEX_CLIENT_ID}
+      - SENPEX_SECRET_ID=${SENPEX_SECRET_ID}
+      - PORT=3000
+    volumes:
+      - ./mcp-server:/app
+    restart: unless-stopped
+    networks:
+      - senpex-network
+
+  # Agent API
+  agent-api:
+    build: ./agent-core
+    ports:
+      - "8080:8080"
+    environment:
+      - MCP_SERVER_URL=http://mcp-server:3000/sse
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    depends_on:
+      - mcp-server
+    restart: unless-stopped
+    networks:
+      - senpex-network
+
+  # Chainlit UI (Chat Interface)
+  chainlit-ui:
+    build: ./chainlit-ui
+    ports:
+      - "8000:8000"
+    environment:
+      - AGENT_API_URL=http://agent-api:8080
+    depends_on:
+      - agent-api
+    restart: unless-stopped
+    networks:
+      - senpex-network
+
+  # Streamlit UI (Ops Dashboard)
+  streamlit-ui:
+    build: ./streamlit-ui
+    ports:
+      - "8501:8501"
+    environment:
+      - AGENT_API_URL=http://agent-api:8080
+    depends_on:
+      - agent-api
+    restart: unless-stopped
+    networks:
+      - senpex-network
+
+networks:
+  senpex-network:
+    driver: bridge
+
+

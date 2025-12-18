@@ -51,7 +51,7 @@ async function senpexRequest(method, endpoint, data = null) {
   }
 }
 
-// Tool handlers (imported from index.js logic)
+// Tool handlers
 async function handleGetDropoffQuote(args) {
   if (!SENPEX_CLIENT_ID || !SENPEX_SECRET_ID) {
     return "Error: Senpex API credentials not configured. Please set SENPEX_CLIENT_ID and SENPEX_SECRET_ID environment variables.";
@@ -263,4 +263,5 @@ export function createMCPServer() {
 
   return server;
 }
+
 

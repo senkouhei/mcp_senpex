@@ -1,248 +1,331 @@
-# Senpex MCP Server (Node.js)
+# Senpex AI Agent - Production Architecture
 
-A Model Context Protocol (MCP) server that provides integration with the Senpex Delivery API. This server allows AI assistants to interact with Senpex's delivery services including quotes, order creation, tracking, and status updates.
+A complete AI agent system with MCP tools, dual UIs (Chainlit & Streamlit), and n8n integration.
 
-## 🚀 Features
+## 🏗️ Architecture
 
-- **Delivery Quotes**: Get pricing for pickup and dropoff deliveries
-- **Reverse Logistics**: Support for multiple pickups to one dropoff location
-- **Order Management**: Create, confirm, and track delivery orders
-- **Real-time Tracking**: Track orders and get driver locations
-- **Status Updates**: Update delivery statuses and manage order lifecycle
-- **Dual Mode**: Run as MCP stdio server OR HTTP REST API
-- **Cloud Ready**: Deploy to Render, Docker, or any Node.js hosting
+```
+┌─────────────────┐     ┌─────────────────┐
+│  Chainlit UI    │────▶│                 │
+│  (Chat, Port    │     │   Agent API     │
+│   8000)         │     │  (FastAPI)      │
+└─────────────────┘     │   Port 8080     │     ┌──────────────┐
+                        │                 │────▶│  MCP Server  │──▶  n8n
+┌─────────────────┐     │                 │     │  (Node.js)   │
+│  Streamlit UI   │────▶│                 │     │  Port 3000   │
+│  (Ops, Port     │     └─────────────────┘     └──────────────┘
+│   8501)         │              │
+└─────────────────┘              ▼
+                         Session & Tool Logs
+```
 
-## 📋 Prerequisites
+## 📁 Project Structure
 
-- Node.js 18 or higher
-- Senpex API credentials (Client ID and Secret ID)
-- npm or yarn package manager
+```
+mcp_senpex/
+├── agent-core/          # FastAPI business logic
+│   ├── main.py
+│   ├── requirements.txt
+│   └── Dockerfile
+│
+├── mcp-server/          # MCP tools (Node.js)
+│   ├── index.js
+│   ├── mcp-server.js
+│   ├── package.json
+│   └── Dockerfile
+│
+├── chainlit-ui/         # Chat interface
+│   ├── app.py
+│   ├── requirements.txt
+│   ├── .chainlit
+│   └── Dockerfile
+│
+├── streamlit-ui/        # Ops dashboard
+│   ├── app.py
+│   ├── requirements.txt
+│   └── Dockerfile
+│
+└── docker-compose.yml   # Local development
+```
 
-## ⚡ Quick Start
+## 🚀 Quick Start
 
-### 1. Clone and Install
+### Local Development (Docker Compose)
 
 ```bash
-git clone <repository-url>
-cd senpex-mcp
+# Clone and setup
+git clone <your-repo>
+cd mcp_senpex
+
+# Create .env file
+cat > .env << EOF
+SENPEX_CLIENT_ID=your_client_id
+SENPEX_SECRET_ID=your_secret_id
+OPENAI_API_KEY=sk-xxx
+EOF
+
+# Start all services
+docker-compose up
+
+# Access UIs
+# Chainlit (Chat):  http://localhost:8000
+# Streamlit (Ops):  http://localhost:8501
+# Agent API:        http://localhost:8080
+# MCP Server:       http://localhost:3000
+```
+
+### Run Individual Services
+
+#### 1. MCP Server
+
+```bash
+cd mcp-server
 npm install
-```
-
-### 2. Configure Environment
-
-```bash
-cp env.example .env
-```
-
-Edit `.env`:
-```env
-SENPEX_CLIENT_ID=your_client_id_here
-SENPEX_SECRET_ID=your_secret_id_here
-```
-
-### 3. Run the Server
-
-**Option A: MCP Stdio Server** (for MCP clients like Claude Desktop)
-```bash
-npm run start:mcp
-```
-
-**Option B: HTTP REST API** (for web deployment)
-```bash
 npm start
-# Server runs on http://localhost:3000
+# Runs on http://localhost:3000
 ```
 
-## 💻 Local Development
-
-### MCP Stdio Mode
+#### 2. Agent API
 
 ```bash
-# Development with auto-reload
-npm run dev:mcp
-
-# Production
-npm run start:mcp
+cd agent-core
+pip install -r requirements.txt
+uvicorn main:app --host 0.0.0.0 --port 8080
+# Runs on http://localhost:8080
 ```
 
-### HTTP API Mode
+#### 3. Chainlit UI
 
 ```bash
-# Development with auto-reload
-npm run dev
-
-# Production
-npm start
+cd chainlit-ui
+pip install -r requirements.txt
+chainlit run app.py -h 0.0.0.0 -p 8000
+# Runs on http://localhost:8000
 ```
 
-### Test the HTTP API
+#### 4. Streamlit UI
 
 ```bash
-# Health check
-curl http://localhost:3000/health
-
-# List available tools
-curl http://localhost:3000/mcp/tools
-
-# Get a delivery quote
-curl -X POST http://localhost:3000/mcp/tools/get_dropoff_quote \
-  -H "Content-Type: application/json" \
-  -d '{
-    "user_email": "test@example.com",
-    "user_name": "John Doe",
-    "pickup_addr": "123 Main St, San Francisco, CA",
-    "dropoff_addr": "456 Market St, San Francisco, CA"
-  }'
+cd streamlit-ui
+pip install -r requirements.txt
+streamlit run app.py --server.port 8501
+# Runs on http://localhost:8501
 ```
 
-## 🌐 Deployment to Render
+## 🌐 Deploy to Render
 
-### Quick Deploy (3 Minutes)
+### Option 1: Individual Web Services
 
-1. **Push to GitHub**
-   ```bash
-   git init
-   git add .
-   git commit -m "Initial commit"
-   git remote add origin <your-repo-url>
-   git push -u origin main
-   ```
+Create **4 separate Web Services** on Render:
 
-2. **Deploy on Render**
-   - Go to [Render Dashboard](https://dashboard.render.com/)
-   - Click "New +" → "Web Service"
-   - Connect your GitHub repository
-   - Render auto-detects settings from `render.yaml`
-   - Add environment variables:
-     - `SENPEX_CLIENT_ID`: Your Senpex client ID
-     - `SENPEX_SECRET_ID`: Your Senpex secret ID
-   - Click "Create Web Service"
+#### 1. MCP Server
+- **Name:** `mcp-senpex`
+- **Root Directory:** `mcp-server`
+- **Build Command:** `npm install`
+- **Start Command:** `npm start`
+- **Port:** `3000`
+- **Env Vars:**
+  ```
+  SENPEX_CLIENT_ID=xxx
+  SENPEX_SECRET_ID=xxx
+  ```
 
-3. **Access Your API**
-   - Your service will be at: `https://your-service.onrender.com`
-   - Test: `https://your-service.onrender.com/health`
+#### 2. Agent API
+- **Name:** `senpex-agent-api`
+- **Root Directory:** `agent-core`
+- **Build Command:** `pip install -r requirements.txt`
+- **Start Command:** `uvicorn main:app --host 0.0.0.0 --port 8080`
+- **Port:** `8080`
+- **Env Vars:**
+  ```
+  MCP_SERVER_URL=https://mcp-senpex.onrender.com/sse
+  OPENAI_API_KEY=sk-xxx
+  ```
 
-**📖 Detailed Deployment Guide**: See [DEPLOYMENT.md](DEPLOYMENT.md) for comprehensive deployment instructions including Docker, environment configuration, and troubleshooting.
+#### 3. Chainlit UI
+- **Name:** `senpex-chat`
+- **Root Directory:** `chainlit-ui`
+- **Docker Build:** Use Dockerfile
+- **Port:** `8000`
+- **Env Vars:**
+  ```
+  AGENT_API_URL=https://senpex-agent-api.onrender.com
+  ```
 
-### Other Deployment Options
+#### 4. Streamlit UI
+- **Name:** `senpex-ops`
+- **Root Directory:** `streamlit-ui`
+- **Docker Build:** Use Dockerfile
+- **Port:** `8501`
+- **Env Vars:**
+  ```
+  AGENT_API_URL=https://senpex-agent-api.onrender.com
+  ```
 
-- **Docker**: See [DEPLOYMENT.md](DEPLOYMENT.md#docker-deployment)
-- **Render Blueprint**: Automatic deployment with `render.yaml`
-- **Other Platforms**: Works on Heroku, Railway, Fly.io, etc.
+### Option 2: Docker Compose (Single VM)
 
-## Available Tools
+For internal use or testing:
 
-### Quote Tools
-- `get_dropoff_quote`: Get delivery quote for pickup and dropoff
-- `get_pickup_quote`: Get quote for multiple pickups to one dropoff
+```yaml
+# Use the provided docker-compose.yml
+docker-compose up -d
+```
 
-### Order Tools
-- `confirm_dropoff`: Create a dropoff order from a quote
-- `confirm_pickup`: Create a pickup order from a quote
-- `get_order_list`: List all orders with pagination
-- `get_order_by_token`: Get order details by token
-
-### Tracking Tools
-- `track_order_by_id`: Track order status by ID
-- `track_order_by_access_key`: Track order by access key
-- `get_driver_location`: Get real-time driver location
-- `get_route_details`: Get detailed route information
-
-### Status Tools
-- `set_delivery_ready`: Mark order ready for delivery
-- `set_laboratory_ready`: Mark as ready for pickup from lab
-- `set_dropoff_received`: Mark as received at dropoff
-
-## API Documentation
-
-For detailed API documentation, visit [Senpex API Documentation](https://api.senpex.com/docs).
-
-## Configuration
+## 🔧 Configuration
 
 ### Environment Variables
 
-- `SENPEX_CLIENT_ID`: Your Senpex API client ID (required)
-- `SENPEX_SECRET_ID`: Your Senpex API secret ID (required)
-- `NODE_ENV`: Environment mode (development/production)
-
-### Transport Types
-
-- 1: Car
-- 3: SUV
-- 8: Pickup Truck
-- 9: Large Van
-
-### Package Sizes
-
-- 1: Small (1-25 lbs)
-- 2: Medium (26-50 lbs)
-- 3: Large (51-70 lbs)
-- 4: Heavy (71-150 lbs)
-
-## 🔧 Usage with MCP Clients
-
-### Claude Desktop
-
-Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
-
-```json
-{
-  "mcpServers": {
-    "senpex": {
-      "command": "node",
-      "args": ["/absolute/path/to/senpex-mcp/index.js"],
-      "env": {
-        "SENPEX_CLIENT_ID": "your_client_id",
-        "SENPEX_SECRET_ID": "your_secret_id"
-      }
-    }
-  }
-}
-```
-
-### Other MCP Clients
-
-The server uses stdio transport. Configure your MCP client to:
-- **Command**: `node`
-- **Args**: `["/path/to/index.js"]`
-- **Environment**: Set `SENPEX_CLIENT_ID` and `SENPEX_SECRET_ID`
-
-### HTTP API (Alternative)
-
-If your application can't use stdio, use the HTTP API mode:
+Create `.env` file in project root:
 
 ```bash
-npm start
+# Senpex API
+SENPEX_CLIENT_ID=your_client_id
+SENPEX_SECRET_ID=your_secret_id
+
+# OpenAI (optional, for future LLM integration)
+OPENAI_API_KEY=sk-xxx
+
+# Service URLs (for production)
+MCP_SERVER_URL=https://mcp-senpex.onrender.com/sse
+AGENT_API_URL=https://senpex-agent-api.onrender.com
 ```
 
-Then make HTTP requests to `http://localhost:3000/mcp/tools/:toolName`
+## 📡 API Endpoints
 
-## Error Handling
+### Agent API (Port 8080)
 
-The server includes comprehensive error handling:
-- API credential validation
-- HTTP error responses
-- Timeout handling (30 seconds)
-- Detailed error messages
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/` | API info |
+| GET | `/health` | Health check |
+| POST | `/agent/message` | Process message |
+| GET | `/agent/session/{id}` | Get session |
+| GET | `/agent/sessions` | List all sessions |
+| GET | `/agent/tools/logs` | Get tool logs |
 
-## Security Notes
+### MCP Server (Port 3000)
 
-- Never commit `.env` file to version control
-- Keep your API credentials secure
-- Use environment variables for sensitive data
-- The server uses HTTPS for all API communications
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/sse` | MCP over SSE (for n8n) |
+| POST | `/message` | SSE message handler |
+| GET | `/api` | Server info |
 
-## Support
+## 🛠️ Available MCP Tools
 
-For issues related to:
-- **Senpex API**: Contact Senpex support
-- **MCP Server**: Open an issue in this repository
+1. **`ping`** - Test connection
+2. **`get_dropoff_quote`** - Get delivery quotes
+3. **`track_order`** - Track order status
 
-## License
+## 🔌 n8n Integration
 
-MIT
+Configure n8n MCP Client node:
 
-## Version
+| Field | Value |
+|-------|-------|
+| **Endpoint** | `https://mcp-senpex.onrender.com/sse` |
+| **Server Transport** | HTTP Streamable |
+| **Authentication** | None |
+| **Tools to Include** | All |
 
-1.0.0
+## 🎨 UI Features
+
+### Chainlit UI (Chat)
+- ✅ Beautiful conversational interface
+- ✅ Real-time tool execution display
+- ✅ Session management
+- ✅ Custom branding
+
+### Streamlit UI (Ops)
+- ✅ Real-time dashboard
+- ✅ Session monitoring
+- ✅ Tool execution logs
+- ✅ Analytics & charts
+- ✅ Auto-refresh support
+
+## 🔒 Production Hardening
+
+### Security Checklist
+- [ ] Add authentication (JWT/Clerk)
+- [ ] Enable rate limiting
+- [ ] Set up CORS properly
+- [ ] Use HTTPS everywhere
+- [ ] Secure environment variables
+- [ ] Add request validation
+
+### Performance
+- [ ] Use Redis for session store
+- [ ] Add caching layer
+- [ ] Enable CDN for static assets
+- [ ] Configure load balancer
+- [ ] Set up monitoring (Sentry, etc.)
+
+### Observability
+- [ ] Add structured logging
+- [ ] Set up APM (Application Performance Monitoring)
+- [ ] Configure alerts
+- [ ] Add health check endpoints
+
+## 📊 Monitoring
+
+Access the Streamlit dashboard at `http://localhost:8501` to monitor:
+- Active sessions
+- Tool execution logs
+- User analytics
+- System health
+
+## 🧪 Testing
+
+```bash
+# Test Agent API
+curl http://localhost:8080/health
+
+# Test MCP Server SSE
+curl -N http://localhost:3000/sse
+
+# Test message processing
+curl -X POST http://localhost:8080/agent/message \
+  -H "Content-Type: application/json" \
+  -d '{"message": "ping"}'
+```
+
+## 📝 Development Workflow
+
+1. **Make changes** to any service
+2. **Test locally** with Docker Compose
+3. **Commit** changes
+4. **Push** to trigger Render deployment
+5. **Monitor** via Streamlit UI
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create feature branch
+3. Make changes
+4. Test locally
+5. Submit pull request
+
+## 📄 License
+
+MIT License - See LICENSE file for details
+
+## 🆘 Support
+
+For issues or questions:
+- Check logs via Streamlit UI
+- Review API health endpoints
+- Check Render deployment logs
+- Test MCP connection with `ping` tool
+
+## 🚧 Roadmap
+
+- [ ] Add OpenAI/Claude LLM integration for better NLU
+- [ ] Implement proper parameter extraction
+- [ ] Add authentication layer
+- [ ] Create more Senpex tools
+- [ ] Add webhook support for n8n
+- [ ] Implement RAG for documentation
+- [ ] Add voice input support
+- [ ] Create mobile-responsive UI
+
 

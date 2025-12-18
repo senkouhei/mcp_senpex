@@ -1,243 +1,301 @@
-# Quick Start Guide
+# 🚀 Quick Start Guide
 
-Get your Senpex MCP Server running in 5 minutes!
+Get your Senpex AI Agent running in 5 minutes!
 
-## 🎯 Choose Your Path
+## Prerequisites
 
-### Path 1: Local MCP Server (for Claude Desktop, IDEs)
-→ Skip to [Local Setup](#local-setup)
+- Docker & Docker Compose installed
+- Senpex API credentials
+- Git
 
-### Path 2: Cloud Deployment (for REST API access)
-→ Skip to [Cloud Deployment](#cloud-deployment)
+## 🏃 Run Locally
 
----
-
-## Local Setup
-
-### Step 1: Install
+### Option A: Automated Setup (Recommended)
 
 ```bash
 # Clone repository
-git clone <repository-url>
-cd senpex-mcp
+git clone https://github.com/your-username/mcp_senpex.git
+cd mcp_senpex
 
-# Install dependencies
-npm install
+# Run setup script (creates virtual environments and installs dependencies)
+./setup-dev.sh
+
+# Edit .env with your credentials
+nano .env
 ```
 
-### Step 2: Configure
-
-```bash
-# Create environment file
-cp env.example .env
-```
-
-Edit `.env`:
-```
-SENPEX_CLIENT_ID=your_client_id
-SENPEX_SECRET_ID=your_secret_id
-```
-
-### Step 3: Run
-
-```bash
-npm run start:mcp
-```
-
-### Step 4: Configure Claude Desktop
-
-Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "senpex": {
-      "command": "node",
-      "args": ["/full/path/to/senpex-mcp/index.js"],
-      "env": {
-        "SENPEX_CLIENT_ID": "your_client_id",
-        "SENPEX_SECRET_ID": "your_secret_id"
-      }
-    }
-  }
-}
-```
-
-**✅ Done!** Restart Claude Desktop and you'll see Senpex tools available.
-
----
-
-## Cloud Deployment
-
-### Step 1: Prepare Code
+### Option B: Docker Compose (Easiest)
 
 ```bash
 # Clone repository
-git clone <repository-url>
-cd senpex-mcp
+git clone https://github.com/your-username/mcp_senpex.git
+cd mcp_senpex
 
-# Initialize git (if not already)
-git init
-git add .
-git commit -m "Initial commit"
+# Create .env file
+cat > .env << EOF
+SENPEX_CLIENT_ID=your_client_id_here
+SENPEX_SECRET_ID=your_secret_id_here
+OPENAI_API_KEY=sk-xxx
+EOF
+
+# Start all services with Docker
+docker-compose up
 ```
 
-### Step 2: Push to GitHub
+Wait ~30 seconds for all services to start.
+
+### 4. Access UIs
+
+Open in your browser:
+
+- **💬 Chat Interface**: http://localhost:8000
+- **📊 Ops Dashboard**: http://localhost:8501
+- **🔧 Agent API**: http://localhost:8080/docs
+- **⚙️ MCP Server**: http://localhost:3000/api
+
+## ✅ Test It
+
+### Test Chat (Chainlit)
+
+1. Open http://localhost:8000
+2. Type: "ping"
+3. You should get: "pong from Senpex MCP server"
+
+### Test Ops Dashboard (Streamlit)
+
+1. Open http://localhost:8501
+2. View Overview page
+3. Check tool execution logs
+
+### Test API
 
 ```bash
-# Create a repo on GitHub, then:
-git remote add origin https://github.com/senkouhei/mcp_senpex.git
-git push -u origin main
-```
+# Test health
+curl http://localhost:8080/health
 
-### Step 3: Deploy to Render
-
-1. Go to [render.com](https://render.com) and sign up/login
-2. Click **"New +"** → **"Web Service"**
-3. Connect your GitHub account
-4. Select your repository
-5. Render will auto-detect the configuration
-
-### Step 4: Set Environment Variables
-
-In the Render dashboard, add:
-
-| Variable | Value |
-|----------|-------|
-| `SENPEX_CLIENT_ID` | your_client_id |
-| `SENPEX_SECRET_ID` | your_secret_id |
-| `NODE_ENV` | production |
-
-### Step 5: Deploy
-
-Click **"Create Web Service"**
-
-Wait 2-3 minutes for deployment...
-
-### Step 6: Test
-
-Your service will be at: `https://your-service-name.onrender.com`
-
-```bash
-# Health check
-curl https://your-service-name.onrender.com/health
-
-# Get tools list
-curl https://your-service-name.onrender.com/mcp/tools
-```
-
-**✅ Done!** Your API is live and ready to use.
-
----
-
-## 🧪 Test Your Setup
-
-### For Local MCP Server
-
-In Claude Desktop, try:
-```
-"Can you get a delivery quote from 123 Main St, San Francisco to 456 Market St, San Francisco for me@example.com?"
-```
-
-### For HTTP API
-
-```bash
-curl -X POST https://your-service.onrender.com/mcp/tools/get_dropoff_quote \
+# Send message
+curl -X POST http://localhost:8080/agent/message \
   -H "Content-Type: application/json" \
-  -d '{
-    "user_email": "test@example.com",
-    "user_name": "Test User",
-    "pickup_addr": "123 Main St, San Francisco, CA 94102",
-    "dropoff_addr": "456 Market St, San Francisco, CA 94103"
-  }'
+  -d '{"message": "ping"}'
 ```
 
-Expected response:
-```
-Senpex Delivery Quote:
-Order: Delivery Order
-Pickup: 123 Main St, San Francisco, CA 94102
-Dropoff: 456 Market St, San Francisco, CA 94103
+## 🌐 Deploy to Render
 
-Price: $15.50
-Distance: 2.3 miles
-Estimated Duration: 15 mins
-Quote Token: abc123...
+### Using Blueprint (1-Click Deploy)
+
+1. **Push to GitHub**
+   ```bash
+   git remote add origin https://github.com/your-username/mcp_senpex.git
+   git push -u origin main
+   ```
+
+2. **Deploy on Render**
+   - Go to https://dashboard.render.com/
+   - Click "New" → "Blueprint"
+   - Connect your GitHub repo
+   - Select `render.yaml`
+   - Add environment variables
+   - Click "Apply"
+
+3. **Done!** All 4 services will be deployed automatically.
+
+### Access Deployed Services
+
+- Chat: `https://senpex-chat.onrender.com`
+- Ops: `https://senpex-ops.onrender.com`  
+- API: `https://senpex-agent-api.onrender.com`
+- MCP: `https://mcp-senpex.onrender.com`
+
+## 🔌 Connect n8n
+
+### n8n MCP Client Configuration
+
+| Field | Value |
+|-------|-------|
+| **Endpoint** | `https://mcp-senpex.onrender.com/sse` |
+| **Server Transport** | HTTP Streamable |
+| **Authentication** | None |
+| **Tools to Include** | All |
+
+### Test n8n Connection
+
+1. Add MCP Client node in n8n
+2. Configure with above settings
+3. Click "Execute step"
+4. You should see tools: `ping`, `get_dropoff_quote`, `track_order`
+
+## 🛠️ Available Tools
+
+### 1. `ping`
+Test connection
+
+**Example:**
+```
+User: "ping"
+Agent: "pong from Senpex MCP server"
 ```
 
----
+### 2. `get_dropoff_quote`
+Get delivery quote from pickup to dropoff
+
+**Example:**
+```
+User: "Get a quote from San Francisco to Los Angeles"
+Agent: Shows price, distance, and duration
+```
+
+### 3. `track_order`
+Track order by ID
+
+**Example:**
+```
+User: "Track order 12345"
+Agent: Shows order status and location
+```
+
+## 📊 Monitor Your System
+
+### Via Streamlit Dashboard
+
+1. Open http://localhost:8501
+2. Navigate through tabs:
+   - **Overview**: Key metrics
+   - **Sessions**: Active conversations
+   - **Tool Logs**: Execution history
+   - **Analytics**: Usage charts
+
+### Via Logs
+
+```bash
+# View all logs
+docker-compose logs -f
+
+# View specific service
+docker-compose logs -f agent-api
+docker-compose logs -f mcp-server
+docker-compose logs -f chainlit-ui
+docker-compose logs -f streamlit-ui
+```
+
+## 🔧 Common Commands
+
+### Stop Services
+```bash
+docker-compose down
+```
+
+### Restart Single Service
+```bash
+docker-compose restart agent-api
+```
+
+### Rebuild After Changes
+```bash
+docker-compose up --build
+```
+
+### View Service Status
+```bash
+docker-compose ps
+```
 
 ## 🐛 Troubleshooting
 
-### "Command not found" error
+### Services won't start
 
-Make sure Node.js 18+ is installed:
+**Check logs:**
 ```bash
-node --version  # Should be v18.0.0 or higher
+docker-compose logs
 ```
 
-### "API credentials not configured" error
+**Common issues:**
+- `.env` file missing or incorrect
+- Ports 3000, 8000, 8080, or 8501 already in use
+- Docker not running
 
-- Check your `.env` file exists
-- Verify `SENPEX_CLIENT_ID` and `SENPEX_SECRET_ID` are set correctly
-- For MCP clients, ensure environment variables are in the config
-
-### Render deployment fails
-
-- Check build logs in Render dashboard
-- Ensure environment variables are set
-- Verify `package.json` and `render.yaml` are committed
-
-### Claude Desktop doesn't show tools
-
-- Restart Claude Desktop completely
-- Check the config file path is correct
-- Use absolute paths, not relative paths
-- Verify the MCP server runs independently first
-
-### Port already in use (HTTP mode)
-
+**Solution:**
 ```bash
-# Change port
-PORT=3001 npm start
+# Check if ports are free
+lsof -i :3000
+lsof -i :8000
+lsof -i :8080
+lsof -i :8501
+
+# Kill processes if needed
+kill -9 <PID>
 ```
 
-Or edit `env.example`:
-```
-PORT=3001
+### Can't connect to Agent API
+
+**Check health:**
+```bash
+curl http://localhost:8080/health
 ```
 
----
+**If fails:**
+```bash
+docker-compose logs agent-api
+```
+
+### MCP tools not working
+
+**Test MCP server:**
+```bash
+curl -N http://localhost:3000/sse
+```
+
+**Should see:**
+```
+event: endpoint
+data: /message?sessionId=xxx
+```
+
+**Check credentials:**
+```bash
+# In .env file
+SENPEX_CLIENT_ID=xxx  # Must be set
+SENPEX_SECRET_ID=xxx  # Must be set
+```
 
 ## 📚 Next Steps
 
-- ✅ Server is running
-- 📖 Read [README.md](README.md) for full tool documentation
-- 🚀 See [DEPLOYMENT.md](DEPLOYMENT.md) for advanced deployment
-- 🔧 Explore all 16 available tools
-- 💡 Build integrations with your apps
+1. **Customize Chainlit UI**
+   - Edit `chainlit-ui/.chainlit`
+   - Add custom branding
+   - Configure authentication
 
----
+2. **Enhance Agent Logic**
+   - Edit `agent-core/main.py`
+   - Add LLM integration
+   - Improve intent detection
+
+3. **Add More Tools**
+   - Edit `mcp-server/mcp-server.js`
+   - Implement new Senpex endpoints
+   - Test with n8n
+
+4. **Production Hardening**
+   - Add authentication
+   - Enable rate limiting
+   - Set up monitoring
+   - Configure backups
+
+## 🎓 Learn More
+
+- [Full Documentation](README.md)
+- [Deployment Guide](DEPLOYMENT.md)
+- [Architecture Overview](README.md#architecture)
 
 ## 🆘 Need Help?
 
-- **Documentation**: Check [README.md](README.md) and [DEPLOYMENT.md](DEPLOYMENT.md)
-- **Senpex API**: [api.senpex.com/docs](https://api.senpex.com/docs)
-- **Issues**: Open an issue on GitHub
-- **MCP Protocol**: [modelcontextprotocol.io](https://modelcontextprotocol.io)
+1. Check logs first: `docker-compose logs`
+2. Review [DEPLOYMENT.md](DEPLOYMENT.md) troubleshooting section
+3. Test each service individually
+4. Open GitHub issue with logs
 
----
+## 🎉 You're Ready!
 
-## 🎉 Success!
+Your Senpex AI Agent is now running locally. Try asking it questions in the Chat UI and monitor activity in the Ops Dashboard!
 
-You now have a working Senpex MCP Server!
-
-Try asking Claude to:
-- Get delivery quotes
-- Create orders
-- Track deliveries
-- Check driver locations
-- And more!
-
-Happy shipping! 📦🚚
+**Happy building! 🚀**
 

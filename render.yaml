@@ -1,19 +1,58 @@
 services:
+  # MCP Server - Node.js
   - type: web
-    name: senpex-mcp-server
+    name: mcp-senpex
     runtime: node
-    plan: starter
+    region: oregon
+    plan: free
+    rootDir: mcp-server
     buildCommand: npm install
     startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 10000
       - key: SENPEX_CLIENT_ID
         sync: false
       - key: SENPEX_SECRET_ID
         sync: false
-    healthCheckPath: /health
-    autoDeploy: true
+
+  # Agent API - Python FastAPI
+  - type: web
+    name: senpex-agent-api
+    runtime: python
+    region: oregon
+    plan: free
+    rootDir: agent-core
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port 8080
+    envVars:
+      - key: MCP_SERVER_URL
+        value: https://mcp-senpex.onrender.com/sse
+      - key: OPENAI_API_KEY
+        sync: false
+
+  # Chainlit UI - Chat Interface
+  - type: web
+    name: senpex-chat
+    runtime: docker
+    region: oregon
+    plan: free
+    rootDir: chainlit-ui
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: AGENT_API_URL
+        value: https://senpex-agent-api.onrender.com
+
+  # Streamlit UI - Ops Dashboard
+  - type: web
+    name: senpex-ops
+    runtime: docker
+    region: oregon
+    plan: free
+    rootDir: streamlit-ui
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: AGENT_API_URL
+        value: https://senpex-agent-api.onrender.com
+
 

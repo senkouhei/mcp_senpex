@@ -1,7 +1,5 @@
-# Use Node.js LTS version
-FROM node:18-alpine
+FROM node:20-slim
 
-# Set working directory
 WORKDIR /app
 
 # Copy package files
@@ -16,9 +14,10 @@ COPY . .
 # Set environment to production
 ENV NODE_ENV=production
 
-# Expose port (if needed for web service)
+# Expose port
 EXPOSE 3000
 
 # Run the application
 CMD ["npm", "start"]
+
 

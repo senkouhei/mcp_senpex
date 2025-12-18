@@ -8,7 +8,7 @@
     "start": "node server.js",
     "start:mcp": "node index.js",
     "dev": "node --watch server.js",
-    "dev:mcp": "node --watch index.js"
+    "serve": "./start.sh"
   },
   "keywords": [
     "mcp",
@@ -28,3 +28,4 @@
     "node": ">=18.0.0"
   }
 }
+
